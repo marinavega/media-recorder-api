@@ -3,27 +3,30 @@
     <MediaRecorderHeader />
 
     <div class="shadow-sm p-5 bg-white rounded">
-      <b-button variant="primary" class="mr-2">Grabar</b-button>
-      <b-button variant="outline-primary" class="mr-2">Pausar</b-button>
-      <b-button variant="outline-success" class="mr-2">Reanudar</b-button>
-      <b-button variant="secondary" class="mr-2">Parar</b-button>
+      <b-button variant="primary" class="mr-2" @click="start" :disabled="startDisabled">Record</b-button>
+      <b-button variant="outline-primary" class="mr-2" @click="pause" :disabled="stopDisabled">Pause</b-button>
+      <b-button variant="outline-success" class="mr-2" @click="resume" :disabled="startDisabled">Resume</b-button>
+      <b-button variant="secondary" @click="stop" :disabled="stopDisabled">Stop</b-button>
 
       <hr>
 
       <h6 class="text-dark">Tip:</h6>
-      <p class="bg-light p-3 text-monospace text-muted">
-        State:  inactive <br>
-        State:  recording <br>
-        State:  paused <br>
-        State:  recording
-      </p>
+      <pre class="bg-light p-3">
+State:  inactive
+State:  recording
+State:  paused
+State:  recording</pre>
 
-      <!-- Si hay audios -->
-      <div>
+      <div v-if="hasAudios">
         <ul class="list-unstyled audio-list">
-          <!-- TODO -->
-          <!-- Bucle de Audios -->
-          <li></li>
+          <li v-for="(item, index) in audioList" :key="index" class="audio-item mb-3">
+            <div class="d-flex justify-content-between">
+              <audio :controls="true" :loop="false" :src="item.src" class="mr-2 w-100"></audio>
+              <div class="d-flex align-items-center">
+                <b-button variant="danger" size="md" @click="removeItem(index)"> Delete </b-button>
+              </div>
+            </div>
+          </li>
         </ul>
       </div>
 
@@ -33,33 +36,81 @@
 
 <script>
 import MediaRecorderHeader from '@/components/HeaderMediaRecorderAPI'
-
 export default {
   name: 'Audio',
   components: { MediaRecorderHeader },
   data () {
     return {
-      // TODO
-      // variables
+      supported: undefined,
+      mediaRecorder: undefined,
+      chunks: [],
+      audioList: [],
+      isRecording: false
     }
   },
   computed: {
-    // TODO
-    // Expresiones
+    startDisabled () {
+      return this.isRecording === true
+    },
+    stopDisabled () {
+      return this.isRecording === false
+    },
+    hasAudios () {
+      return this.audioList.length > 0
+    }
   },
   methods: {
-    // TODO
-    // Funciones / Métodos
+    start () {
+      console.log('State: ', this.mediaRecorder.state)
+      this.mediaRecorder.start()
+      this.isRecording = true
+    },
+    stop () {
+      console.log('State: ', this.mediaRecorder.state)
+      this.mediaRecorder.stop()
+      this.isRecording = false
+    },
+    pause () {
+      console.log('State: ', this.mediaRecorder.state)
+      this.mediaRecorder.pause()
+      this.isRecording = false
+    },
+    resume () {
+      console.log('State: ', this.mediaRecorder.state)
+      this.mediaRecorder.resume()
+      this.isRecording = true
+    },
+    removeItem (index) {
+      this.audioList.splice(index, 1)
+    }
   },
   created () {
-    // Comprobar si el navegador soporta esta 'feature'
     if (navigator.mediaDevices && navigator.mediaDevices.getUserMedia) {
-
-      // TODO
-      // Pedir acceso al micrófono
-
+      this.supported = true
+      navigator.mediaDevices.getUserMedia({ audio: true })
+        .then((stream) => {
+          console.log(stream)
+          this.mediaRecorder = new MediaRecorder(stream)
+          this.mediaRecorder.ondataavailable = (e) => {
+            this.chunks.push(e.data)
+          }
+          this.mediaRecorder.onstop = (e) => {
+            console.log(stream)
+            console.log('recorder stopped')
+            var blob = new Blob(this.chunks, { 'type': 'audio/ogg; codecs=opus' })
+            this.chunks = []
+            const audioURL = window.URL.createObjectURL(blob)
+            this.audioList.push({
+              src: audioURL
+            })
+            window.URL.revokeObjectURL(blob)
+          }
+        })
+        .catch((err) => {
+          console.log('Err: ' + err)
+        })
     } else {
-      console.log('-- No audio 😭')
+      this.supported = false
     }
   }
 }
